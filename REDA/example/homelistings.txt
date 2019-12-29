@@ -1,0 +1,10 @@
+MLS#	Address	Price	Type	Bedrooms	Bathrooms	URL
+30775881	49 Wilsonview Avenue, Guelph, Ontario 	444999 	Condo	4	3	https://www.realtor.ca/real-estate/21424220/4-bedroom-condo-49-wilsonview-avenue-guelph
+X4657496	31 SCHRODER CRES, Guelph, Ontario 	430000 	Condo	3	2	https://www.realtor.ca/real-estate/21423743/3-bedroom-condo-31-schroder-cres-guelph-grange-hill-east
+30775035	8 CLAIRFIELDS Drive W, Guelph, Ontario 	799800 	Single Family	5 + 2	4	https://www.realtor.ca/real-estate/21423336/5-2-bedroom-single-family-house-8-clairfields-drive-w-guelph
+30782537	3 -  714 Willow Road, Guelph, Ontario 	649900 	Condo	3	4	https://www.realtor.ca/real-estate/21420839/3-bedroom-condo-3-714-willow-road-guelph
+H4069512	404 1291 GORDON Street, Guelph, Ontario 	337900 	Condo	3	3	https://www.realtor.ca/real-estate/21417108/3-bedroom-condo-404-1291-gordon-street-guelph
+30781454	9 RICKSON Avenue, Guelph, Ontario 	689900 	Single Family	3	3	https://www.realtor.ca/real-estate/21416772/3-bedroom-single-family-house-9-rickson-avenue-guelph
+30781985	1506 -  150 Wellington Street E, Guelph, Ontario 	710000 	Condo	2	2	https://www.realtor.ca/real-estate/21415680/2-bedroom-condo-1506-150-wellington-street-e-guelph
+X4655435	117 GRANGE ST, Guelph, Ontario 	825000 	Single Family	6	3	https://www.realtor.ca/real-estate/21415300/6-bedroom-single-family-house-117-grange-st-guelph-central-east
+30782162	115 -  26 Ontario Street, Guelph, Ontario 	319000 	Condo	0	1	https://www.realtor.ca/real-estate/21414951/0-bedroom-condo-115-26-ontario-street-guelph
