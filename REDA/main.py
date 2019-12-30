@@ -57,6 +57,7 @@ def writeOutResults(dictHomeObjects):
 
 
 def ZoloMetaDataPull(MLSvalue,header):
+    #MLSvalue="30760991"#"X4617994" #30760991
     url="https://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
     page_html = requests.get(url,headers=header)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
@@ -69,20 +70,22 @@ def ZoloMetaDataPull(MLSvalue,header):
         print("Record found for MLS#:{}".format(MLSvalue))
         pass
 
-    hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled")
+    hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled").find("li",class_="listing-column text-4")
 
 
 
     try:
-        neighbourhood = hit_html.find("span", class_="neighbourhood").text[1:]
+        neighbourhood = hit_html.find("span",class_="neighbourhood").text[1:]
+        print(neighbourhood)
+        #.("span", class_="neighbourhood").text[1:]
     except:
         neighbourhood = "-"
         pass
 
-    print(neighbourhood)
+
     detailed_url = hit_html.a["href"]
 
-
+    #print(url, detailed_url, neighbourhood)
 
 
     detailed_html = requests.get(detailed_url,headers=header)
@@ -93,7 +96,7 @@ def ZoloMetaDataPull(MLSvalue,header):
     for i in range(0,len(property_details_list)):
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
-    print(url, detailed_url)
+    #print(url, detailed_url)
 
     return ({"ZoloURL":detailed_url,
              "Neighbourhood":neighbourhood,
