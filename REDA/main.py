@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re, os, datetime
-
+from REDA import __version__
 
 class Home:
     def __init__(self):
@@ -52,7 +52,7 @@ def writeOutResults(dictHomeObjects):
                             dictHomeObjects[MLSvalue].datetoday
                                                               ))
 
-
+    print("Wrote final results to the {}".format(os.path.join(os.getcwd(),"homelistings.txt")))
 
 
 
@@ -76,7 +76,7 @@ def ZoloMetaDataPull(MLSvalue,header):
 
     try:
         neighbourhood = hit_html.find("span",class_="neighbourhood").text[1:]
-        print(neighbourhood)
+        #print(neighbourhood)
         #.("span", class_="neighbourhood").text[1:]
     except:
         neighbourhood = "-"
@@ -109,13 +109,20 @@ def ZoloMetaDataPull(MLSvalue,header):
              "DaysOnMarket": DOM}
             )
 
-
+def getPreviousRecordsFromFile():
+    keys=[]
+    if os.path.exists("homelistings.txt"):
+        with open("homelistings.txt", "r") as fp:
+            for line in fp.readlines()[1:]:
+                keys.append(line.split("\t")[0])
+    MLSvaluesPrevDict=dict.fromkeys(keys,"")
+    return(MLSvaluesPrevDict)
 
     #with open(file="zolopage.html", mode="w") as fp:
     #    fp.write(detailed_html.content.decode("utf-8"))
 
 if __name__ == '__main__':
-    print("Real Estate Data Aggregator")
+    print("Real Estate Data Aggregator version {}".format(__version__))
 
 
 
@@ -146,7 +153,14 @@ if __name__ == '__main__':
     house_containers = html_soup.find_all('div', class_="smallListingCard")
 
     for house_container in house_containers:
+        MLSvaluePrevious = getPreviousRecordsFromFile()
+
         MLSvalue=house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
+
+        if MLSvalue in MLSvaluePrevious.keys():
+            print("MLSvalue {} already exists in homelistings.txt file. Skipping ...".format(MLSvalue))
+            continue
+
 
         HomeInstance = Home()
 
