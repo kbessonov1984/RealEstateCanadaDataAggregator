@@ -97,10 +97,13 @@ def ZoloMetaDataPull(MLSvalue,header):
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
     #print(url, detailed_url)
+    for i in range(0, len(property_details_list)):
+        if property_details_list[i].dt.text == "Year Built" or property_details_list[i].dt.text == "Age":
+            homeAge=property_details_list[i].dd.text
 
     return ({"ZoloURL":detailed_url,
              "Neighbourhood":neighbourhood,
-             "Age": property_details_list[4].dd.text.rstrip(),
+             "Age": homeAge.rstrip(),
              "Size":property_details_list[2].dd.text.rstrip(),
              "Taxes": property_details_list[5].dd.text.rstrip(),
              "DaysOnMarket": DOM}
