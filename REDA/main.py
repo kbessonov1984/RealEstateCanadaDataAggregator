@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re, os, datetime
-from REDA import __version__
+__version__="1.0.1"
 
 class Home:
     def __init__(self):
@@ -28,10 +28,9 @@ def writeOutResults(dictHomeObjects):
         fpout = open(file="homelistings.txt", mode="a")
     else:
         fpout = open(file="homelistings.txt",mode="w")
-
-
-    fpout.write("MLS#\tAddress\tNeighbourhood\tLatitude\tLongitude\tPrice\tSize(sqft)\tTaxes\tAge\tDOM\tType\tBedrooms\tBathrooms\tRealtorURL\t"
+        fpout.write("MLS#\tAddress\tNeighbourhood\tLatitude\tLongitude\tPrice\tSize(sqft)\tTaxes\tAge\tDOM\tType\tBedrooms\tBathrooms\tRealtorURL\t"
                 "ZoloURL\tDate\n")
+
     for MLSvalue in dictHomeObjects.keys():
         fpout.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                             MLSvalue,
