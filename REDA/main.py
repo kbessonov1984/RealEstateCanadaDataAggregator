@@ -23,6 +23,7 @@ class Home:
 
 
 
+
 def writeOutResults(dictHomeObjects):
     if os.path.exists("homelistings.txt"):
         fpout = open(file="homelistings.txt", mode="a")
@@ -57,21 +58,21 @@ def writeOutResults(dictHomeObjects):
 
 def ZoloMetaDataPull(MLSvalue,header):
     #MLSvalue="30760991"#"X4617994" #30760991
-    url="https://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
-    page_html = requests.get(url,headers=header)
+    url="http://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
+
+    page_html = requests.get(url,headers=header, verify=False)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
 
     try:
         status_msg = html_soup.find("div", class_="nearby-container sm-border").find("h4",class_="gut xs-py2 xs-border-bottom").text
         print("MLS#:{}.{}".format(MLSvalue,status_msg))
-        return(dict.fromkeys(["ZoloURL","Neighbourhood","Age","Size","Taxes","DaysOnMarket"],"-"))
+        return(dict.fromkeys(["ZoloURL","Neighbourhood", "Age", "Size", "Taxes", "DaysOnMarket",
+                              "PropertyType", "HomeType"], "-"))
     except:
         print("Record found for MLS#:{}".format(MLSvalue))
         pass
 
     hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled").find("li",class_="listing-column text-4")
-
-
 
     try:
         neighbourhood = hit_html.find("span",class_="neighbourhood").text[1:]
@@ -81,32 +82,38 @@ def ZoloMetaDataPull(MLSvalue,header):
         neighbourhood = "-"
         pass
 
-
     detailed_url = hit_html.a["href"]
 
     #print(url, detailed_url, neighbourhood)
-
-
     detailed_html = requests.get(detailed_url,headers=header)
     detailed_listing_soup = BeautifulSoup(detailed_html.content,"html.parser")
 
     property_details_list = detailed_listing_soup.find("div",class_="column-container sm-column-count-2 column-gap").find_all("dl",class_="column")
 
+
     for i in range(0,len(property_details_list)):
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
-    #print(url, detailed_url)
-    for i in range(0, len(property_details_list)):
         if property_details_list[i].dt.text == "Year Built" or property_details_list[i].dt.text == "Age":
-            homeAge=property_details_list[i].dd.text
+            homeAge = property_details_list[i].dd.text
+        if property_details_list[i].dt.text == "Type":
+            hometype = property_details_list[i].dd.text
+            if re.match("condo", hometype, re.IGNORECASE):
+                hometype = "Condo"
+            else:
+                hometype = "Single Family"
 
-    return ({"ZoloURL":detailed_url,
+
+    ZoloDict = {"ZoloURL":detailed_url,
              "Neighbourhood":neighbourhood,
              "Age": homeAge.rstrip(),
              "Size":property_details_list[2].dd.text.rstrip(),
              "Taxes": property_details_list[5].dd.text.rstrip(),
-             "DaysOnMarket": DOM}
-            )
+             "DaysOnMarket": DOM,
+             "HomeType": hometype}
+
+
+    return ( ZoloDict )
 
 def getPreviousRecordsFromFile():
     keys=[]
@@ -126,8 +133,8 @@ if __name__ == '__main__':
 
 
     header = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
-
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+    }
 
 
 
@@ -163,30 +170,35 @@ if __name__ == '__main__':
 
         HomeInstance = Home()
 
-        HomeInstance.realtorurl = house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"]
-        HomeInstance.price = re.sub("[$|,]+","", house_container.find_all("div", class_="smallListingCardBody")[0].find("div",class_="smallListingCardPrice").text)
-        HomeInstance.address = house_container.find_all("div", class_="smallListingCardAddress")[0].text
+
+        HomeInstance.realtorurl = str(house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"])
+        HomeInstance.price = int(re.sub("[$|,]+","", house_container.find_all("div", class_="smallListingCardBody")[0].find("div",class_="smallListingCardPrice").text))
+        HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text)
 
         lat_long_string = house_container.find_all("a", class_="propertyCardDetailsNoteIcon noteIcon")[0]["data-value"]
         lat_long_tuple = re.match(".*_(\d+\.\d+)_(.*\.\d+)", lat_long_string).group(1, 2)
-        HomeInstance.latitude = lat_long_tuple[0]
-        HomeInstance.longitude = lat_long_tuple[1]
+
+        HomeInstance.latitude = float(lat_long_tuple[0])
+        HomeInstance.longitude = float(lat_long_tuple[1])
+
 
         #if re.match("#",HomeInstance.address):
         #    continue #skip addresses that start with # sign
-        HomeInstance.bedrooms = house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[0].text
-        HomeInstance.bathrooms = house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[1].text
+        HomeInstance.bedrooms = str(house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[0].text)
+        HomeInstance.bathrooms = str(house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[1].text)
 
+		#try to get property type by the realtor.ca url
         if re.match(".*single-family.*", HomeInstance.realtorurl):
             HomeInstance.type="Single Family"
         elif re.match(".*condo.*", HomeInstance.realtorurl):
             HomeInstance.type="Condo"
         else:
-            HomeInstance="Unknown"
+            HomeInstance.type="Unknown"
 
-        HomeInstance.datetoday=str(datetime.date.today())
-
+        HomeInstance.datetoday = datetime.date.today()
         ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header)
+        if HomeInstance.type == "Unknown" and ZoloMetaDict["HomeType"] != "-":
+            HomeInstance.type=ZoloMetaDict["HomeType"]
 
         if ZoloMetaDict:
             HomeInstance.zolourl = ZoloMetaDict["ZoloURL"]
