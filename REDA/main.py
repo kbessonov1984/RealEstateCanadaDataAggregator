@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re, os, datetime
-__version__="1.0.1"
+__version__="1.0.5"
 
 class Home:
     def __init__(self):
@@ -19,7 +19,9 @@ class Home:
         self.age = "",
         self.size = "",
         self.taxes = "",
-        self.daysonmarket = ""
+        self.daysonmarket = "",
+        self.soldprice = "",
+        self.status = "",
 
 
 
@@ -30,10 +32,10 @@ def writeOutResults(dictHomeObjects):
     else:
         fpout = open(file="homelistings.txt",mode="w")
         fpout.write("MLS#\tAddress\tNeighbourhood\tLatitude\tLongitude\tPrice\tSize(sqft)\tTaxes\tAge\tDOM\tType\tBedrooms\tBathrooms\tRealtorURL\t"
-                "ZoloURL\tDate\n")
+                "ZoloURL\tDate\tStatus\tSoldPrice\n")
 
     for MLSvalue in dictHomeObjects.keys():
-        fpout.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+        fpout.write("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
                             MLSvalue,
                             dictHomeObjects[MLSvalue].address,
                             dictHomeObjects[MLSvalue].neighbourhood,
@@ -49,51 +51,106 @@ def writeOutResults(dictHomeObjects):
                             dictHomeObjects[MLSvalue].bathrooms,
                             dictHomeObjects[MLSvalue].realtorurl,
                             dictHomeObjects[MLSvalue].zolourl,
-                            dictHomeObjects[MLSvalue].datetoday
+                            dictHomeObjects[MLSvalue].datetoday,
+                            dictHomeObjects[MLSvalue].status,
+                            dictHomeObjects[MLSvalue].soldprice
                                                               ))
 
     print("Wrote final results to the {}".format(os.path.join(os.getcwd(),"homelistings.txt")))
 
 
 
-def ZoloMetaDataPull(MLSvalue,header):
+def ZoloMetaDataPull(MLSvalue,header,address):
     #MLSvalue="30760991"#"X4617994" #30760991
-    url="http://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
+    ZoloDict = dict.fromkeys(["ZoloURL", "Neighbourhood", "Age",
+                   "Size", "Taxes", "DaysOnMarket", "DatePosted",
+                   "PropertyType", "HomeType",
+                   "Status", "SoldPrice", "SoldDate"], "-")
 
-    page_html = requests.get(url,headers=header, verify=False)
+    url="https://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
+
+    page_html = requests.get(url,headers=header)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
+
+    print(url)
 
     try:
         status_msg = html_soup.find("div", class_="nearby-container sm-border").find("h4",class_="gut xs-py2 xs-border-bottom").text
         print("MLS#:{}.{}".format(MLSvalue,status_msg))
-        return(dict.fromkeys(["ZoloURL","Neighbourhood", "Age", "Size", "Taxes", "DaysOnMarket",
-                              "PropertyType", "HomeType"], "-"))
     except:
+        status_msg=""; pass
+
+    if status_msg == "Oops! No homes match your search.":
+        unit=None; streetnum=None; streetname=None;
+        addressmatches = re.match(r"(\d+)\s+(.+),\s+(.+),\s+(.+)", address).groups() #freehold match
+
+        streetnum = int(addressmatches[0]) #tests if street number is correctly parsed
+        streetname = re.sub(" ", "-", addressmatches[1]);
+        city = addressmatches[2]
+
+
+        if re.search(r"\d+", streetname):
+            addressmatches = re.match(r"(\d+)\s+(\-\s+)(\d+)\s+(.+),\s+(.+),\s+(.+)", address).groups() #condo
+            print(addressmatches)
+            unit = int(addressmatches[0])
+            streetnum=int(addressmatches[2])
+            streetname=re.sub(" ","-",addressmatches[3])
+            city=addressmatches[4]
+
+
+        print(addressmatches)
+
+
+        if unit and streetnum and streetname:
+            detailed_url = "https://www.zolo.ca/" + city + "-real-estate/" + str(streetnum) + "-" + streetname+"/"+str(unit)
+        elif streetnum and streetname:
+            detailed_url = "https://www.zolo.ca/"+ city +"-real-estate/"+str(streetnum)+"-"+streetname
+        else:
+            return( ZoloDict )
+    else:
         print("Record found for MLS#:{}".format(MLSvalue))
-        pass
+        hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled").find("li",class_="listing-column text-4")
+        detailed_url = hit_html.a["href"]
 
-    hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled").find("li",class_="listing-column text-4")
+    neighbourhood="-"
 
-    try:
-        neighbourhood = hit_html.find("span",class_="neighbourhood").text[1:]
-        #print(neighbourhood)
-        #.("span", class_="neighbourhood").text[1:]
-    except:
-        neighbourhood = "-"
-        pass
-
-    detailed_url = hit_html.a["href"]
-
-    #print(url, detailed_url, neighbourhood)
+    print(detailed_url)
+    #detailed_url = "https://www.zolo.ca/guelph-real-estate/111-moss-place"
     detailed_html = requests.get(detailed_url,headers=header)
     detailed_listing_soup = BeautifulSoup(detailed_html.content,"html.parser")
 
-    property_details_list = detailed_listing_soup.find("div",class_="column-container sm-column-count-2 column-gap").find_all("dl",class_="column")
+    try:
+        property_details_list = detailed_listing_soup.find("div",class_="column-container sm-column-count-2 column-gap").find_all("dl",class_="column")
+    except:
+        property_details_list=[]
+        pass
 
+    try:
+        status_price_section = detailed_listing_soup.find("section", class_="listing-price sm-text-right xs-flex-order-2").find_all("div")
+    except:
+        ZoloDict["ZoloURL"] = detailed_url
+        return( ZoloDict )
 
+    #if status section is in Sold property state
+    property_status = "";soldprice = "";solddate = "";soldprice = "";
+    if any([re.match("Sold",element.text) != None for element in status_price_section]):
+        property_status="Sold"
+        for i in range(0,len(status_price_section)):
+            item = status_price_section[i]
+            if re.match(r"\$\d+\w+\d+",item.text) and i==0:
+                soldprice = int(re.sub(",","",item.span.text))
+            elif re.match("Listed",item.text) and i==1:
+                listedprice = int(re.sub(r"\$|,","",item.span.text))
+            elif re.match("Sold",item.text) and i==2:
+                solddate = item.span.text
+    elif any([re.match("Added",element.text) != None for element in status_price_section]):
+        property_status = "For Sale"
+
+    DOM=""; DatePosted="";homeAge=""; hometype="";
     for i in range(0,len(property_details_list)):
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
+            DatePosted = re.match(r"(\d+\s+\()(\w+\s+\d+,\s+\d+)",DOM).group(2)
         if property_details_list[i].dt.text == "Year Built" or property_details_list[i].dt.text == "Age":
             homeAge = property_details_list[i].dd.text
         if property_details_list[i].dt.text == "Type":
@@ -101,8 +158,13 @@ def ZoloMetaDataPull(MLSvalue,header):
             if re.match("condo", hometype, re.IGNORECASE):
                 hometype = "Condo"
             else:
-                hometype = "Single Family"
+                hometype = "Freehold"
 
+    property_other_details=detailed_listing_soup.find("section",class_="sm-mb3 sm-column-count-2 column-gap").find_all("div")
+    for i in range(0, len(property_other_details)):
+        item = property_other_details[i]
+        if(item.text == "Community"):
+            neighbourhood = property_other_details[i+1].span.text
 
     ZoloDict = {"ZoloURL":detailed_url,
              "Neighbourhood":neighbourhood,
@@ -110,9 +172,13 @@ def ZoloMetaDataPull(MLSvalue,header):
              "Size":property_details_list[2].dd.text.rstrip(),
              "Taxes": property_details_list[5].dd.text.rstrip(),
              "DaysOnMarket": DOM,
-             "HomeType": hometype}
+             "DatePosted": DatePosted,
+             "HomeType": hometype,
+             "Status": property_status,
+             "SoldPrice": soldprice,
+             "SoldDate": solddate}
 
-
+    print(ZoloDict)
     return ( ZoloDict )
 
 def getPreviousRecordsFromFile():
@@ -176,7 +242,7 @@ if __name__ == '__main__':
         HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text)
 
         lat_long_string = house_container.find_all("a", class_="propertyCardDetailsNoteIcon noteIcon")[0]["data-value"]
-        lat_long_tuple = re.match(".*_(\d+\.\d+)_(.*\.\d+)", lat_long_string).group(1, 2)
+        lat_long_tuple = re.match(r".*_(\d+\.\d+)_(.*\.\d+)", lat_long_string).group(1, 2)
 
         HomeInstance.latitude = float(lat_long_tuple[0])
         HomeInstance.longitude = float(lat_long_tuple[1])
@@ -189,14 +255,14 @@ if __name__ == '__main__':
 
 		#try to get property type by the realtor.ca url
         if re.match(".*single-family.*", HomeInstance.realtorurl):
-            HomeInstance.type="Single Family"
+            HomeInstance.type="Freehold"
         elif re.match(".*condo.*", HomeInstance.realtorurl):
             HomeInstance.type="Condo"
         else:
             HomeInstance.type="Unknown"
 
         HomeInstance.datetoday = datetime.date.today()
-        ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header)
+        ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
         if HomeInstance.type == "Unknown" and ZoloMetaDict["HomeType"] != "-":
             HomeInstance.type=ZoloMetaDict["HomeType"]
 
@@ -207,10 +273,13 @@ if __name__ == '__main__':
             HomeInstance.size = ZoloMetaDict["Size"]
             HomeInstance.taxes = ZoloMetaDict["Taxes"]
             HomeInstance.daysonmarket = ZoloMetaDict["DaysOnMarket"]
+            HomeInstance.status = ZoloMetaDict["Status"]
+            HomeInstance.soldprice = ZoloMetaDict["SoldPrice"]
 
 
         #print(MLSvalue, HomeInstance.address, HomeInstance.price, HomeInstance.bedrooms, HomeInstance.bathrooms)
         dictHomeObjects[MLSvalue]= HomeInstance
+
 
 
     writeOutResults(dictHomeObjects)
