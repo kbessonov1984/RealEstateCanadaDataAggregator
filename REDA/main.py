@@ -83,21 +83,29 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     if status_msg == "Oops! No homes match your search.":
         unit=None; streetnum=None; streetname=None;
         print(address)
-        addressmatches = re.match(r"^(\d+)\s+(.+),\s+(.+),\s+(.+)", address)
+        patterns={"freehold": r"^(\d+)\s+(.+),\s+(.+),\s+(.+)",
+                  "condo": r"#?(\d+)\s+(\-\s{0,})(\d+)\s+(.+),\s+(.+),\s+(.+)"
+                  }
+        for key in patterns.keys():
+            print(key)
+            addressmatches = re.match(patterns[key], address)
+            if addressmatches and key == "condo":
+                addressmatches = addressmatches.groups()
+                unit = int(addressmatches[0])
+                streetnum = int(addressmatches[2])
+                streetname = re.sub(" ", "-", addressmatches[3])
+                city = addressmatches[4]
 
-        if addressmatches:
-            addressmatches = addressmatches.groups() #freehold match
-            streetnum = int(addressmatches[0]) #tests if street number is correctly parsed
-            streetname = re.sub(" ", "-", addressmatches[1]);
-            city = addressmatches[2]
+            elif addressmatches and key == "freehold":
+                addressmatches = addressmatches.groups()  # freehold match
+                streetnum = int(addressmatches[0])  # tests if street number is correctly parsed
+                streetname = re.sub(" ", "-", addressmatches[1]);
+                city = addressmatches[2]
+                if re.search("\d+",streetname):
+                    continue
+                else:
+                    break
 
-        else:
-            addressmatches = re.match(r"#?(\d+)\s+(\-\s?)(\d+)\s+(.+),\s+(.+),\s+(.+)", address).groups() #condo
-            print(addressmatches)
-            unit = int(addressmatches[0])
-            streetnum=int(addressmatches[2])
-            streetname=re.sub(" ","-",addressmatches[3])
-            city=addressmatches[4]
 
 
         print(addressmatches)
