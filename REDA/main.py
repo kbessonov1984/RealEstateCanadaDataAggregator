@@ -72,7 +72,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     page_html = requests.get(url,headers=header)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
 
-    print(url)
+
 
     try:
         status_msg = html_soup.find("div", class_="nearby-container sm-border").find("h4",class_="gut xs-py2 xs-border-bottom").text
@@ -118,9 +118,17 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         else:
             return( ZoloDict )
     else:
-        print("Record found for MLS#:{}".format(MLSvalue))
+        print("Record found for MLS#:{}".format(MLSvalue));
         hit_html = html_soup.find("ul", class_="listings xs-flex xs-flex-column sm-flex-row sm-flex-wrap list-unstyled").find("li",class_="listing-column text-4")
-        detailed_url = hit_html.a["href"]
+        detailed_url=""
+        for link in hit_html.find_all("a"):
+            if re.match("https://www.zolo",link["href"]):
+                detailed_url=link["href"]
+                break
+        #detailed_url = hit_html.a["href"]
+        #print(detailed_url,address,hit_html);
+        if detailed_url == "":
+            return(ZoloDict)
 
     neighbourhood="-"
 
@@ -180,7 +188,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
              "Neighbourhood":neighbourhood,
              "Age": homeAge.rstrip(),
              "Size":property_details_list[2].dd.text.rstrip(),
-             "Taxes": property_details_list[5].dd.text.rstrip(),
+             "Taxes": re.sub("\n", "", property_details_list[5].dd.text.rstrip()),
              "DaysOnMarket": DOM,
              "DatePosted": DatePosted,
              "HomeType": hometype,
@@ -249,7 +257,7 @@ if __name__ == '__main__':
 
         HomeInstance.realtorurl = str(house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"])
         HomeInstance.price = int(re.sub("[$|,]+","", house_container.find_all("div", class_="smallListingCardBody")[0].find("div",class_="smallListingCardPrice").text))
-        HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text)
+        HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text).strip()
 
         lat_long_string = house_container.find_all("a", class_="propertyCardDetailsNoteIcon noteIcon")[0]["data-value"]
         lat_long_tuple = re.match(r".*_(\d+\.\d+)_(.*\.\d+)", lat_long_string).group(1, 2)
