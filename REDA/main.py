@@ -164,19 +164,19 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     elif any([re.match("Added",element.text) != None for element in status_price_section]):
         property_status = "For Sale"
 
-    DOM=""; DatePosted="";homeAge=""; hometype="";
+    DOM=""; DatePosted="";homeAge=""; hometype="Freehold";
     for i in range(0,len(property_details_list)):
+        print(property_details_list[i].dt.text, property_details_list[i].dd.text)
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
             DatePosted = re.match(r"(\d+\s+\()(\w+\s+\d+,\s+\d+)",DOM).group(2)
         if property_details_list[i].dt.text == "Year Built" or property_details_list[i].dt.text == "Age":
             homeAge = property_details_list[i].dd.text
-        if property_details_list[i].dt.text == "Type":
-            hometype = property_details_list[i].dd.text
-            if re.match("condo", hometype, re.IGNORECASE):
+        if re.match("condo", property_details_list[i].dd.text, re.IGNORECASE) or \
+            re.match("Strata", property_details_list[i].dt.text):
                 hometype = "Condo"
-            else:
-                hometype = "Freehold"
+
+
 
     property_other_details=detailed_listing_soup.find("section",class_="sm-mb3 sm-column-count-2 column-gap").find_all("div")
     for i in range(0, len(property_other_details)):
