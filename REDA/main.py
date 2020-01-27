@@ -65,13 +65,12 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     ZoloDict = dict.fromkeys(["ZoloURL", "Neighbourhood", "Age",
                    "Size", "Taxes", "DaysOnMarket", "DatePosted",
                    "PropertyType", "HomeType",
-                   "Status", "SoldPrice", "SoldDate"], "-")
+                   "Status", "SoldPrice", "SoldDate", "Price"], "-")
 
     url="https://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
 
     page_html = requests.get(url,headers=header)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
-
 
 
     try:
@@ -101,7 +100,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
                 streetnum = int(addressmatches[0])  # tests if street number is correctly parsed
                 streetname = re.sub(" ", "-", addressmatches[1]);
                 city = addressmatches[2]
-                if re.search("\d+",streetname):
+                if re.search(r"\d+",streetname):
                     continue
                 else:
                     break
@@ -130,6 +129,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         if detailed_url == "":
             return(ZoloDict)
 
+    #detailed listing pooling for detailed url
     neighbourhood="-"
 
     print(detailed_url)
@@ -150,6 +150,9 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         return( ZoloDict )
 
     #if status section is in Sold property state
+    askprice = int(re.sub(r"\$|,","",status_price_section[0].find("span").text))
+
+
     property_status = "";soldprice = "";solddate = "";soldprice = "";
     if any([re.match("Sold",element.text) != None for element in status_price_section]):
         property_status="Sold"
@@ -186,6 +189,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
 
     ZoloDict = {"ZoloURL":detailed_url,
              "Neighbourhood":neighbourhood,
+             "Price": askprice,
              "Age": homeAge.rstrip(),
              "Size":property_details_list[2].dd.text.rstrip(),
              "Taxes": re.sub("\n", "", property_details_list[5].dd.text.rstrip()),
@@ -210,6 +214,43 @@ def getPreviousRecordsFromFile():
 
     #with open(file="zolopage.html", mode="w") as fp:
     #    fp.write(detailed_html.content.decode("utf-8"))
+
+def getZoloRecodsFromNet(city="guelph"):
+    print("Get all current records from the Internet")
+    listings_html = [];
+    MLS_detail_url_dict = {}
+
+    for i in range(1,20):
+        url = "https://www.zolo.ca/"+city+"-real-estate/page-"+str(i)
+        print(url)
+        zolo_page_html = requests.get(url)
+        html_soup = BeautifulSoup(zolo_page_html.content, "html.parser")
+        if html_soup:
+            listings_html = listings_html + html_soup.find_all("li", class_="listing-column text-4")
+        else:
+            break
+    print("Extracted {} listings".format(len(listings_html)))
+
+
+    for listing in listings_html:
+        MLSstring = listing.article.find_all("a")[1].find("img")["alt"]
+        listing_url = listing.article.find("a")["href"]
+        MLS = re.match(r"^.+MLS:\s+(.+)",MLSstring).group(1)
+        MLS_detail_url_dict[MLS] = {"url":"","address":""}
+        MLS_detail_url_dict[MLS]["url"] = listing_url
+        #Housetype = re.match(r"^(\w+)\s+.+", MLSstring).group(1) #House or Condo
+        #Housetype = re.sub(r"^(?!Condo).+", "Freehold", Housetype)
+        MLS_street = listing.article.find_all("div")[0].find("span", class_="street").text
+        MLS_city = listing.article.find_all("div")[0].find("span", class_="city").text
+        MLS_province = listing.article.find_all("div")[0].find("span", class_="province").text
+        MLS_address = MLS_street+", "+MLS_city+", "+MLS_province
+        MLS_detail_url_dict[MLS]["address"] = MLS_address
+
+    return (MLS_detail_url_dict)
+
+#/html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[2]/a/img
+# /html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[2]/a
+# /html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[1]/div[1]/a/h3/span[1]
 
 if __name__ == '__main__':
     print("Real Estate Data Aggregator version {}".format(__version__))
@@ -237,15 +278,20 @@ if __name__ == '__main__':
 
     # here, we fetch the content from the url, using the requests library
     #page_content = BeautifulSoup(page_response.content, "html.parser")
-    with open(file="page.html", mode="r") as fp:
-        page_html = fp.read()
-    html_soup = BeautifulSoup(page_html, "html.parser")
-    house_containers = html_soup.find_all('div', class_="smallListingCard")
+    if os.path.exists("page.html"):
+        with open(file="page.html", mode="r") as fp:
+            page_html = fp.read()
+        html_soup = BeautifulSoup(page_html, "html.parser")
+        house_containers = html_soup.find_all('div', class_="smallListingCard")  # from the realtor.hmtl file
+    else:
+        house_containers = [] #empty
+
+
 
     for house_container in house_containers:
         MLSvaluePrevious = getPreviousRecordsFromFile()
 
-        MLSvalue=house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
+        MLSvalue = house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
 
         if MLSvalue in MLSvaluePrevious.keys():
             print("MLSvalue {} already exists in homelistings.txt file. Skipping ...".format(MLSvalue))
@@ -280,6 +326,7 @@ if __name__ == '__main__':
             HomeInstance.type="Unknown"
 
         HomeInstance.datetoday = datetime.date.today()
+
         ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
         if HomeInstance.type == "Unknown" and ZoloMetaDict["HomeType"] != "-":
             HomeInstance.type=ZoloMetaDict["HomeType"]
@@ -298,6 +345,39 @@ if __name__ == '__main__':
         #print(MLSvalue, HomeInstance.address, HomeInstance.price, HomeInstance.bedrooms, HomeInstance.bathrooms)
         dictHomeObjects[MLSvalue]= HomeInstance
 
+
+    MLSCityZoloDict = getZoloRecodsFromNet(city = "guelph")
+
+    for MLSvalue in MLSCityZoloDict.keys():
+        print(list(getPreviousRecordsFromFile().keys())+[])
+        MLSvaluePrevious = list(getPreviousRecordsFromFile().keys()) + list(dictHomeObjects.keys())
+
+
+        if MLSvaluePrevious:
+            if MLSvalue in MLSvaluePrevious:
+                print("MLSvalue {} already exists in pooled data. Skipping ...".format(MLSvalue))
+                continue
+
+        HomeInstance = Home()
+        HomeInstance.address = MLSCityZoloDict[MLSvalue]["address"]
+        ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
+
+        if ZoloMetaDict["HomeType"] != "-":
+            HomeInstance.type=ZoloMetaDict["HomeType"]
+
+        if ZoloMetaDict:
+            HomeInstance.zolourl = ZoloMetaDict["ZoloURL"]
+            HomeInstance.neighbourhood = ZoloMetaDict["Neighbourhood"]
+            HomeInstance.price = ZoloMetaDict["Price"]
+            HomeInstance.age = ZoloMetaDict["Age"]
+            HomeInstance.size = ZoloMetaDict["Size"]
+            HomeInstance.taxes = ZoloMetaDict["Taxes"]
+            HomeInstance.daysonmarket = ZoloMetaDict["DaysOnMarket"]
+            HomeInstance.status = ZoloMetaDict["Status"]
+            HomeInstance.soldprice = ZoloMetaDict["SoldPrice"]
+
+
+        dictHomeObjects[MLSvalue] = HomeInstance
 
 
     writeOutResults(dictHomeObjects)
