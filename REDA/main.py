@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re, os, datetime
-__version__="1.0.5"
+__version__="1.1.0"
 
 class Home:
     def __init__(self):
@@ -65,11 +65,12 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     ZoloDict = dict.fromkeys(["ZoloURL", "Neighbourhood", "Age",
                    "Size", "Taxes", "DaysOnMarket", "DatePosted",
                    "PropertyType", "HomeType",
-                   "Status", "SoldPrice", "SoldDate", "Price"], "-")
+                   "Status", "SoldPrice", "SoldDate", "Price",
+                   "Latitude", "Longitude", "Bedrooms","Bathrooms"], "-")
 
     url="https://www.zolo.ca/index.php?sarea="+MLSvalue+"&filter=1"
 
-    page_html = requests.get(url,headers=header)
+    page_html = requests.get(url, headers=header)
     html_soup = BeautifulSoup(page_html.content,"html.parser")
 
 
@@ -86,7 +87,6 @@ def ZoloMetaDataPull(MLSvalue,header,address):
                   "condo": r"#?(\d+)\s+(\-\s{0,})(\d+)\s+(.+),\s+(.+),\s+(.+)"
                   }
         for key in patterns.keys():
-            print(key)
             addressmatches = re.match(patterns[key], address)
             if addressmatches and key == "condo":
                 addressmatches = addressmatches.groups()
@@ -104,8 +104,6 @@ def ZoloMetaDataPull(MLSvalue,header,address):
                     continue
                 else:
                     break
-
-
 
         print(addressmatches)
 
@@ -150,7 +148,10 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         return( ZoloDict )
 
     #if status section is in Sold property state
-    askprice = int(re.sub(r"\$|,","",status_price_section[0].find("span").text))
+    try:
+        askprice = int(re.sub(r"\$|,","",status_price_section[0].find("span").text))
+    except:
+        askprice = 0
 
 
     property_status = "";soldprice = "";solddate = "";soldprice = "";
@@ -222,7 +223,7 @@ def getZoloRecodsFromNet(city="guelph"):
 
     for i in range(1,20):
         url = "https://www.zolo.ca/"+city+"-real-estate/page-"+str(i)
-        print(url)
+        print("Scanning Zolo page at {}".format(url))
         zolo_page_html = requests.get(url)
         html_soup = BeautifulSoup(zolo_page_html.content, "html.parser")
         if html_soup:
@@ -231,26 +232,39 @@ def getZoloRecodsFromNet(city="guelph"):
             break
     print("Extracted {} listings".format(len(listings_html)))
 
-
+    #/html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[1]/ul/li[2]
     for listing in listings_html:
-        MLSstring = listing.article.find_all("a")[1].find("img")["alt"]
-        listing_url = listing.article.find("a")["href"]
-        MLS = re.match(r"^.+MLS:\s+(.+)",MLSstring).group(1)
-        MLS_detail_url_dict[MLS] = {"url":"","address":""}
-        MLS_detail_url_dict[MLS]["url"] = listing_url
-        #Housetype = re.match(r"^(\w+)\s+.+", MLSstring).group(1) #House or Condo
-        #Housetype = re.sub(r"^(?!Condo).+", "Freehold", Housetype)
-        MLS_street = listing.article.find_all("div")[0].find("span", class_="street").text
-        MLS_city = listing.article.find_all("div")[0].find("span", class_="city").text
-        MLS_province = listing.article.find_all("div")[0].find("span", class_="province").text
-        MLS_address = MLS_street+", "+MLS_city+", "+MLS_province
-        MLS_detail_url_dict[MLS]["address"] = MLS_address
+            MLSbaths = "-"; MLSbedrooms = "-"
+            MLSlatitude = listing.find_all("meta")[0]["content"]
+            MLSlongitude = listing.find_all("meta")[1]["content"]
+            listing_url = listing.article.find("a")["href"]
+
+            try:
+                MLSbedrooms = re.match(r"^(.+)\s+\w+", listing.find_all("li")[1].text).group(1)
+                MLSbaths = re.match(r"^.+(\d+)\s+\w+", listing.find_all("li")[2].text).group(1)
+                MLS_street = listing.article.find_all("div")[0].find("span", class_="street").text
+                MLS_city = listing.article.find_all("div")[0].find("span", class_="city").text
+                MLS_province = listing.article.find_all("div")[0].find("span", class_="province").text
+                MLSstring = listing.article.find_all("a")[1].find("img")["alt"]
+            except Exception as error:
+                print("Exception for url {} and error {}".format(listing_url, error))
+
+
+            MLS = re.match(r"^.+MLS:\s+(.+)",MLSstring).group(1)
+            MLS_detail_url_dict[MLS] = {"url":"","address":""}
+            MLS_detail_url_dict[MLS]["url"] = listing_url
+            MLS_detail_url_dict[MLS]["latitude"] = MLSlatitude
+            MLS_detail_url_dict[MLS]["longitude"] = MLSlongitude
+            MLS_detail_url_dict[MLS]["baths"] = MLSbaths
+            MLS_detail_url_dict[MLS]["bedrooms"] = MLSbedrooms
+            #Housetype = re.match(r"^(\w+)\s+.+", MLSstring).group(1) #House or Condo
+            #Housetype = re.sub(r"^(?!Condo).+", "Freehold", Housetype)
+
+            MLS_address = MLS_street+", "+MLS_city+", "+MLS_province
+            MLS_detail_url_dict[MLS]["address"] = MLS_address
 
     return (MLS_detail_url_dict)
 
-#/html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[2]/a/img
-# /html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[2]/a
-# /html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[1]/div[1]/a/h3/span[1]
 
 if __name__ == '__main__':
     print("Real Estate Data Aggregator version {}".format(__version__))
@@ -349,7 +363,6 @@ if __name__ == '__main__':
     MLSCityZoloDict = getZoloRecodsFromNet(city = "guelph")
 
     for MLSvalue in MLSCityZoloDict.keys():
-        print(list(getPreviousRecordsFromFile().keys())+[])
         MLSvaluePrevious = list(getPreviousRecordsFromFile().keys()) + list(dictHomeObjects.keys())
 
 
@@ -359,7 +372,14 @@ if __name__ == '__main__':
                 continue
 
         HomeInstance = Home()
+        HomeInstance.datetoday = datetime.date.today()
+        HomeInstance.realtorurl = "-"
         HomeInstance.address = MLSCityZoloDict[MLSvalue]["address"]
+        HomeInstance.longitude = MLSCityZoloDict[MLSvalue]["longitude"]
+        HomeInstance.latitude = MLSCityZoloDict[MLSvalue]["latitude"]
+        HomeInstance.bedrooms = MLSCityZoloDict[MLSvalue]["bedrooms"]
+        HomeInstance.bathrooms = MLSCityZoloDict[MLSvalue]["baths"]
+
         ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
 
         if ZoloMetaDict["HomeType"] != "-":
@@ -378,7 +398,6 @@ if __name__ == '__main__':
 
 
         dictHomeObjects[MLSvalue] = HomeInstance
-
 
     writeOutResults(dictHomeObjects)
 
