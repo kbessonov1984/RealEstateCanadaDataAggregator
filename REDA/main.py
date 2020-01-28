@@ -61,6 +61,13 @@ def writeOutResults(dictHomeObjects):
 
 
 def ZoloMetaDataPull(MLSvalue,header,address):
+    '''
+    Get listing direct url  based on MLS listing code and address
+    :param MLSvalue: MLS number
+    :param header: optional header user browser profile string with information on browser and OS (optional)
+    :param address: address in formation <#><street name><city><province>
+    :return: dictionary with meta date fields
+    '''
     #MLSvalue="30760991"#"X4617994" #30760991
     ZoloDict = dict.fromkeys(["ZoloURL", "Neighbourhood", "Age",
                    "Size", "Taxes", "DaysOnMarket", "DatePosted",
@@ -83,8 +90,9 @@ def ZoloMetaDataPull(MLSvalue,header,address):
     if status_msg == "Oops! No homes match your search.":
         unit=None; streetnum=None; streetname=None;
         print(address)
-        patterns={"freehold": r"^(\d+)\s+(.+),\s+(.+),\s+(.+)",
-                  "condo": r"#?(\d+)\s+(\-\s{0,})(\d+)\s+(.+),\s+(.+),\s+(.+)"
+        patterns={
+                    "freehold": r"^(\d+)\s+(.+),\s+(.+),\s+(.+)",
+                    "condo": r"#?(\d+)\s+(\-\s{0,})(\d+)\s+(.+),\s+(.+),\s+(.+)"
                   }
         for key in patterns.keys():
             addressmatches = re.match(patterns[key], address)
@@ -125,14 +133,21 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         #detailed_url = hit_html.a["href"]
         #print(detailed_url,address,hit_html);
         if detailed_url == "":
-            return(ZoloDict)
+            return( ZoloDict )
 
+    ZoloDict = getDetailedZoloListingData(detailed_url, ZoloDict)
+
+    print(ZoloDict)
+    return (ZoloDict)
+
+def getDetailedZoloListingData(detailed_url, ZoloDict):
     #detailed listing pooling for detailed url
-    neighbourhood="-"
+
 
     print(detailed_url)
     #detailed_url = "https://www.zolo.ca/guelph-real-estate/111-moss-place"
-    detailed_html = requests.get(detailed_url,headers=header)
+
+    detailed_html = requests.get(detailed_url)
     detailed_listing_soup = BeautifulSoup(detailed_html.content,"html.parser")
 
     try:
@@ -147,11 +162,37 @@ def ZoloMetaDataPull(MLSvalue,header,address):
         ZoloDict["ZoloURL"] = detailed_url
         return( ZoloDict )
 
-    #if status section is in Sold property state
-    try:
-        askprice = int(re.sub(r"\$|,","",status_price_section[0].find("span").text))
-    except:
-        askprice = 0
+    property_section = detailed_listing_soup.find_all("div", class_="column")
+    provincename = "No Data"
+    provincestring = [field.span.text for field in property_section if field.div.text == "Province"]
+    if provincestring:
+        provincename = provincestring[0]
+
+    bedrooms = "No Data"
+    bedroomssting = [field.span.text for field in property_section if field.div.text == "Bedrooms"]
+    if bedroomssting:
+        bedrooms = bedroomssting[0]
+
+    bathrooms = "No Data"
+    bathroomsstring = [field.span.text for field in property_section if field.div.text == "Bathrooms"]
+    if bathroomsstring:
+        bathrooms = bathroomsstring[0]
+
+
+
+
+
+    askprice = re.sub(r"\$|,","",status_price_section[0].find("span").text.strip())
+
+    if re.match(r"\d+",askprice) == None:
+        askprice = re.sub(r"\$|,","", detailed_listing_soup.find("td", class_="xs-align-top xs-text-right sm-text-left").span.text)
+    if re.match(r"\d+",askprice) == None:
+        match = [ p.text.strip() for p in detailed_listing_soup.find_all("p") if re.match(r".+listed\s+at.+",p.text.strip()) ]
+        if len(match) == 1:
+            priceparts = re.match(r".+listed\s+at\s+\$(\d+),(\d+)",match[0]).groups()
+            askprice = "".join(str(i) for i in priceparts)
+        else:
+            askprice = "No Data"
 
 
     property_status = "";soldprice = "";solddate = "";soldprice = "";
@@ -170,7 +211,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
 
     DOM=""; DatePosted="";homeAge=""; hometype="Freehold";
     for i in range(0,len(property_details_list)):
-        print(property_details_list[i].dt.text, property_details_list[i].dd.text)
+        #print(property_details_list[i].dt.text, property_details_list[i].dd.text)
         if property_details_list[i].dt.text == "Days on Site":
             DOM = property_details_list[i].dd.text.strip()
             DatePosted = re.match(r"(\d+\s+\()(\w+\s+\d+,\s+\d+)",DOM).group(2)
@@ -183,24 +224,45 @@ def ZoloMetaDataPull(MLSvalue,header,address):
 
 
     property_other_details=detailed_listing_soup.find("section",class_="sm-mb3 sm-column-count-2 column-gap").find_all("div")
+    neighbourhood = ""
     for i in range(0, len(property_other_details)):
         item = property_other_details[i]
         if(item.text == "Community"):
             neighbourhood = property_other_details[i+1].span.text
 
-    ZoloDict = {"ZoloURL":detailed_url,
-             "Neighbourhood":neighbourhood,
-             "Price": askprice,
-             "Age": homeAge.rstrip(),
-             "Size":property_details_list[2].dd.text.rstrip(),
-             "Taxes": re.sub("\n", "", property_details_list[5].dd.text.rstrip()),
-             "DaysOnMarket": DOM,
-             "DatePosted": DatePosted,
-             "HomeType": hometype,
-             "Status": property_status,
-             "SoldPrice": soldprice,
-             "SoldDate": solddate}
 
+    if neighbourhood == "":
+        neighbourhoodstring = [field.span.text for field in property_section if field.div.text == "Subdivision Name"]
+        print(neighbourhoodstring)
+        if neighbourhoodstring:
+            neighbourhood = re.match("\d+\s+-\s+(.+)",neighbourhoodstring[0]).group(1)
+        else:
+            neighbourhood = "-"
+
+
+    try:
+        MLSvalue = detailed_listing_soup.find("th", class_="table-header-mls text-secondary xs-text-6 bold").span.text
+    except:
+        MLSvalue = detailed_listing_soup.find("dl", class_="column key-fact-mls").span.text
+    #print(detailed_listing_soup.find("dl", class_="column key-fact-mls"));exit(1)
+    #column key-fact-mls
+    ZoloDict = {"MLS": MLSvalue,
+                "Street": detailed_listing_soup.find("h1", class_="address xs-text-2 sm-text-1 truncate bold").text.strip(),
+                "Province": provincename,
+                "ZoloURL": detailed_url,
+                "Neighbourhood": neighbourhood,
+                "Price": askprice,
+                "Bedrooms": bedrooms,
+                "Bathrooms": bathrooms,
+                "Age": homeAge.rstrip(),
+                "Size": property_details_list[2].dd.text.rstrip(),
+                "Taxes": re.sub("\n", "", property_details_list[5].dd.text.rstrip()),
+                "DaysOnMarket": DOM,
+                "DatePosted": DatePosted,
+                "HomeType": hometype,
+                "Status": property_status,
+                "SoldPrice": soldprice,
+                "SoldDate": solddate}
     print(ZoloDict)
     return ( ZoloDict )
 
@@ -216,7 +278,7 @@ def getPreviousRecordsFromFile():
     #with open(file="zolopage.html", mode="w") as fp:
     #    fp.write(detailed_html.content.decode("utf-8"))
 
-def getZoloRecodsFromNet(city="guelph"):
+def getZoloRecodsFromNet(city="Guelph"):
     print("Get all current records from the Internet")
     listings_html = [];
     MLS_detail_url_dict = {}
@@ -234,24 +296,39 @@ def getZoloRecodsFromNet(city="guelph"):
 
     #/html/body/div[1]/main/section[2]/div/ul/li[1]/article/div[1]/ul/li[2]
     for listing in listings_html:
-            MLSbaths = "-"; MLSbedrooms = "-"
+            #MLSbaths = "-"; MLSbedrooms = "-"
             MLSlatitude = listing.find_all("meta")[0]["content"]
             MLSlongitude = listing.find_all("meta")[1]["content"]
+
+
             listing_url = listing.article.find("a")["href"]
 
+            if len(listing_url) < 10:
+                print("Skipping straing url {}".format(listing_url))
+                continue
+
             try:
-                MLSbedrooms = re.match(r"^(.+)\s+\w+", listing.find_all("li")[1].text).group(1)
-                MLSbaths = re.match(r"^.+(\d+)\s+\w+", listing.find_all("li")[2].text).group(1)
+                MLSstring = listing.article.find_all("a")[1].find("img")["alt"]
+                MLS = re.match(r"^.+MLS:\s+(.+)", MLSstring).group(1)
                 MLS_street = listing.article.find_all("div")[0].find("span", class_="street").text
                 MLS_city = listing.article.find_all("div")[0].find("span", class_="city").text
                 MLS_province = listing.article.find_all("div")[0].find("span", class_="province").text
-                MLSstring = listing.article.find_all("a")[1].find("img")["alt"]
+
+                MLSbedrooms = re.match(r"^(.+)\s+\w+", listing.find_all("li")[1].text).group(1)
+                MLSbaths = re.match(r"^.+(\d+)\s+\w+", listing.find_all("li")[2].text).group(1)
             except Exception as error:
                 print("Exception for url {} and error {}".format(listing_url, error))
+                ZoloDict = getDetailedZoloListingData(detailed_url= listing_url, ZoloDict= {})
+                MLS = ZoloDict["MLS"]
+                MLS_street = ZoloDict["Street"]
+                MLS_city = city
+                MLS_province = ZoloDict["Province"]
+                MLSbedrooms = ZoloDict["Bedrooms"]
+                MLSbaths = ZoloDict["Bathrooms"]
 
+                #{'ZoloURL': 'https://www.zolo.ca/guelph-real-estate/lot-12-owens-way', 'Neighbourhood': 'Guelph South', 'Price': '979900', 'Age': 'No Data', 'Size': 'No Data', 'Taxes': 'No Data', 'DaysOnMarket': '5 (Jan 22, 2020)', 'DatePosted': 'Jan 22, 2020', 'HomeType': 'Freehold', 'Status': 'For Sale', 'SoldPrice': '', 'SoldDate': ''}
 
-            MLS = re.match(r"^.+MLS:\s+(.+)",MLSstring).group(1)
-            MLS_detail_url_dict[MLS] = {"url":"","address":""}
+            MLS_detail_url_dict[MLS] = {"url": "", "address": ""}
             MLS_detail_url_dict[MLS]["url"] = listing_url
             MLS_detail_url_dict[MLS]["latitude"] = MLSlatitude
             MLS_detail_url_dict[MLS]["longitude"] = MLSlongitude
