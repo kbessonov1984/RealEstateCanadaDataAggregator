@@ -370,7 +370,7 @@ if __name__ == '__main__':
     # here, we fetch the content from the url, using the requests library
     #page_content = BeautifulSoup(page_response.content, "html.parser")
     if os.path.exists("page.html"):
-        with open(file="page.html", mode="r") as fp:
+        with open(file="page.html", mode="r", encoding="utf-8") as fp:
             page_html = fp.read()
         html_soup = BeautifulSoup(page_html, "html.parser")
         house_containers = html_soup.find_all('div', class_="smallListingCard")  # from the realtor.hmtl file
@@ -392,7 +392,10 @@ if __name__ == '__main__':
         HomeInstance = Home()
 
 
-        HomeInstance.realtorurl = str(house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"])
+        HomeInstance.realtorurl = house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"]
+        if re.match("https://realtor.ca",HomeInstance.realtorurl) == None:
+            HomeInstance.realtorurl = "https://realtor.ca"+HomeInstance.realtorurl
+
         HomeInstance.price = int(re.sub("[$|,]+","", house_container.find_all("div", class_="smallListingCardBody")[0].find("div",class_="smallListingCardPrice").text))
         HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text).strip()
 
