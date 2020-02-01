@@ -15,13 +15,13 @@ class Home:
         self.datetoday = ""
         self.latitude = ""
         self.longitude = ""
-        self.neighbourhood = "",
-        self.age = "",
-        self.size = "",
-        self.taxes = "",
-        self.daysonmarket = "",
-        self.soldprice = "",
-        self.status = "",
+        self.neighbourhood = "-"
+        self.age = ""
+        self.size = ""
+        self.taxes = ""
+        self.daysonmarket = ""
+        self.soldprice = ""
+        self.status = ""
 
 
 
@@ -380,7 +380,7 @@ if __name__ == '__main__':
 
 
     for house_container in house_containers:
-        MLSvaluePrevious = getPreviousRecordsFromFile()
+        MLSvaluePrevious = getPreviousRecordsFromFile() #dictionary of previous MLS values
 
         MLSvalue = house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
 
@@ -391,11 +391,9 @@ if __name__ == '__main__':
 
         HomeInstance = Home()
 
-
         HomeInstance.realtorurl = house_container.find_all("a",class_="blockLink listingDetailsLink")[0]["href"]
         if re.match("https://realtor.ca",HomeInstance.realtorurl) == None:
             HomeInstance.realtorurl = "https://realtor.ca"+HomeInstance.realtorurl
-
         HomeInstance.price = int(re.sub("[$|,]+","", house_container.find_all("div", class_="smallListingCardBody")[0].find("div",class_="smallListingCardPrice").text))
         HomeInstance.address = str(house_container.find_all("div", class_="smallListingCardAddress")[0].text).strip()
 
@@ -421,7 +419,10 @@ if __name__ == '__main__':
 
         HomeInstance.datetoday = datetime.date.today()
 
+
+        #put meta data from Zolo by MLS and address
         ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
+
         if HomeInstance.type == "Unknown" and ZoloMetaDict["HomeType"] != "-":
             HomeInstance.type=ZoloMetaDict["HomeType"]
 
@@ -440,11 +441,11 @@ if __name__ == '__main__':
         dictHomeObjects[MLSvalue]= HomeInstance
 
 
-    MLSCityZoloDict = getZoloRecodsFromNet(city = "guelph")
+    #get other listings data
+    MLSCityZoloDict = getZoloRecodsFromNet(city = "Guelph")
 
     for MLSvalue in MLSCityZoloDict.keys():
-        MLSvaluePrevious = list(getPreviousRecordsFromFile().keys()) + list(dictHomeObjects.keys())
-
+        MLSvaluePrevious = list(getPreviousRecordsFromFile().keys()) + list(dictHomeObjects.keys()) #previous MLS values
 
         if MLSvaluePrevious:
             if MLSvalue in MLSvaluePrevious:
