@@ -180,20 +180,27 @@ def getDetailedZoloListingData(detailed_url, ZoloDict):
 
 
 
+    try:
+        if status_price_section[0].find("span"):
+            askprice = re.sub(r"\$|,","",status_price_section[0].find("span").text.strip())
 
+        if re.match(r"\d+",askprice) == None:
+            try:
+                askprice = re.sub(r"\$|,","", detailed_listing_soup.find("td", class_="xs-align-top xs-text-right sm-text-left").span.text)
+            except:
+                askprice = "No Data"
 
-    askprice = re.sub(r"\$|,","",status_price_section[0].find("span").text.strip())
+        if re.match(r"\d+",askprice) == None:
+            match = [ p.text.strip() for p in detailed_listing_soup.find_all("p") if re.match(r".+listed\s+at.+",p.text.strip()) ]
+            if len(match) == 1:
+                pricecomma = re.match(r".*listed\s+at\s+\$(.+)\s+with.+",match[0]).group(1)
+                askprice = int(re.sub(",","",pricecomma))
 
-    if re.match(r"\d+",askprice) == None:
-        askprice = re.sub(r"\$|,","", detailed_listing_soup.find("td", class_="xs-align-top xs-text-right sm-text-left").span.text)
-    if re.match(r"\d+",askprice) == None:
-        match = [ p.text.strip() for p in detailed_listing_soup.find_all("p") if re.match(r".+listed\s+at.+",p.text.strip()) ]
-        if len(match) == 1:
-            priceparts = re.match(r".+listed\s+at\s+\$(\d+),(\d+)",match[0]).groups()
-            askprice = "".join(str(i) for i in priceparts)
-        else:
-            askprice = "No Data"
-
+            else:
+                askprice = "No Data"
+    except Exception as e:
+        print(e)
+        askprice = "No Data"
 
     property_status = "";soldprice = "";solddate = "";soldprice = "";
     if any([re.match("Sold",element.text) != None for element in status_price_section]):
@@ -235,7 +242,7 @@ def getDetailedZoloListingData(detailed_url, ZoloDict):
         neighbourhoodstring = [field.span.text for field in property_section if field.div.text == "Subdivision Name"]
         print(neighbourhoodstring)
         if neighbourhoodstring:
-            neighbourhood = re.match("\d+\s+-\s+(.+)",neighbourhoodstring[0]).group(1)
+            neighbourhood = re.match(r"\d+\s+-\s+(.+)",neighbourhoodstring[0]).group(1)
         else:
             neighbourhood = "-"
 
@@ -278,7 +285,7 @@ def getPreviousRecordsFromFile():
     #with open(file="zolopage.html", mode="w") as fp:
     #    fp.write(detailed_html.content.decode("utf-8"))
 
-def getZoloRecodsFromNet(city="Guelph"):
+def getZoloRecodsFromNet(city="Kitchener"): #Guelph
     print("Get all current records from the Internet")
     listings_html = [];
     MLS_detail_url_dict = {}

@@ -6,8 +6,8 @@ header = {
 
 def test_ZoloMetaDataPull():
 
-    address = "4748 Pioneer Trail, Guelph, Ontario"
-    zolodict = ZoloMetaDataPull(MLSvalue="30786948", header=header, address=address) #30784864 #X4457153 (Sold) X4670598(For Sale)
+    address = "912 Fall Harvest Court, Kitchener, Ontario"
+    zolodict = ZoloMetaDataPull(MLSvalue="X4667528", header=header, address=address) #30784864 #X4457153 (Sold) X4670598(For Sale)
     print(zolodict)
     assert zolodict["HomeType"] == "Freehold"
 
