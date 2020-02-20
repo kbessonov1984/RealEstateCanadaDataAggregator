@@ -137,7 +137,7 @@ def ZoloMetaDataPull(MLSvalue,header,address):
 
     ZoloDict = getDetailedZoloListingData(detailed_url, ZoloDict)
 
-    print(ZoloDict)
+    #print(ZoloDict)
     return (ZoloDict)
 
 def getDetailedZoloListingData(detailed_url, ZoloDict):
@@ -270,7 +270,7 @@ def getDetailedZoloListingData(detailed_url, ZoloDict):
                 "Status": property_status,
                 "SoldPrice": soldprice,
                 "SoldDate": solddate}
-    print(ZoloDict)
+    #print(ZoloDict)
     return ( ZoloDict )
 
 def getPreviousRecordsFromFile():
@@ -285,7 +285,7 @@ def getPreviousRecordsFromFile():
     #with open(file="zolopage.html", mode="w") as fp:
     #    fp.write(detailed_html.content.decode("utf-8"))
 
-def getZoloRecodsFromNet(city="Kitchener"): #Guelph
+def getZoloRecodsFromNet(city = "Guelph"): #Guelph
     print("Get all current records from the Internet")
     listings_html = [];
     MLS_detail_url_dict = {}
@@ -388,8 +388,21 @@ if __name__ == '__main__':
 
     for house_container in house_containers:
         MLSvaluePrevious = getPreviousRecordsFromFile() #dictionary of previous MLS values
+        MLSvalue = ""
+        try:
+            MLSvalue = house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
+        except:
+            pass
 
-        MLSvalue = house_container.find_all("div", class_="smallListingCardMLSVal")[0]["title"]
+        try:
+            imageurl = house_container.find("img", class_="smallListingCardImage")["data-savepage-src"]
+            MLSvalue = re.match(r"(.*\/)(.*)_\d+\.jpg", imageurl).group(2).upper()
+        except:
+            pass
+
+        if MLSvalue == "":
+            print("Could not extract Realtor.ca MLS#")
+            continue
 
         if MLSvalue in MLSvaluePrevious.keys():
             print("MLSvalue {} already exists in homelistings.txt file. Skipping ...".format(MLSvalue))
@@ -409,14 +422,14 @@ if __name__ == '__main__':
 
         HomeInstance.latitude = float(lat_long_tuple[0])
         HomeInstance.longitude = float(lat_long_tuple[1])
-
+        #print(HomeInstance.realtorurl);exit(1)
 
         #if re.match("#",HomeInstance.address):
         #    continue #skip addresses that start with # sign
         HomeInstance.bedrooms = str(house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[0].text)
         HomeInstance.bathrooms = str(house_container.find_all("div", class_="smallListingCardIconStrip")[0].find_all("div",class_="smallListingCardIconNum")[1].text)
 
-		#try to get property type by the realtor.ca url
+        #try to get property type by the realtor.ca url
         if re.match(".*single-family.*", HomeInstance.realtorurl):
             HomeInstance.type="Freehold"
         elif re.match(".*condo.*", HomeInstance.realtorurl):
@@ -468,7 +481,9 @@ if __name__ == '__main__':
         HomeInstance.bedrooms = MLSCityZoloDict[MLSvalue]["bedrooms"]
         HomeInstance.bathrooms = MLSCityZoloDict[MLSvalue]["baths"]
 
+
         ZoloMetaDict = ZoloMetaDataPull(MLSvalue=MLSvalue, header=header, address=HomeInstance.address)
+
 
         if ZoloMetaDict["HomeType"] != "-":
             HomeInstance.type=ZoloMetaDict["HomeType"]
